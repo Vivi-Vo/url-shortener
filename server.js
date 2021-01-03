@@ -9,6 +9,16 @@ const urlObject = require("url").URL;
 
 const dns = require("dns");
 
+function isUrlValid(str) {
+  var pattern = new RegExp('^(https?:\\/\\/)?' + // protocol
+    '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|' + // domain name
+    '((\\d{1,3}\\.){3}\\d{1,3}))' + // OR ip (v4) address
+    '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*' + // port and path
+    '(\\?[;&a-z\\d%_.~+=-]*)?' + // query string
+    '(\\#[-a-z\\d_]*)?$', 'i'); // fragment locator
+  return !!pattern.test(str);
+
+}
 //DB connection
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
@@ -21,8 +31,8 @@ db.once("open", function () {
 });
 
 const urlSchema = new mongoose.Schema({
-  originURL: String,
-  hashURL: String,
+  original_url: String,
+  short_url: String,
 });
 
 const URL = mongoose.model("URL", urlSchema);
@@ -33,7 +43,11 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use("/public", express.static(`${process.cwd()}/public`));
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
+app.use(
+  bodyParser.urlencoded({
+    extended: false,
+  })
+);
 
 app.get("/", function (req, res) {
   res.sendFile(process.cwd() + "/views/index.html");
@@ -46,35 +60,40 @@ app.listen(port, function () {
 app.post("/api/shorturl/new", (req, res) => {
   var url = req.body.url;
   try {
-    var urlObj = new urlObject(url);
-    var addr = dns.lookup(urlObj.hostname, (err, addr, family) =>{
-      if (err)
-        res.json({ error: "Invalid URL" });
-        return;
-    })
-
-    console.log(addr);
+    var urlObj = new urlObject(url);  
+    if (!isUrlValid(url)) {
+      res.json({
+        error: 'invalid url',
+      });
+    } else {
+      var hash = crypto.createHash("sha256").update(url).digest("hex").slice(0, 5);
+      var newURL = URL({
+        original_url: url,
+        short_url: hash,
+      });
+      newURL.save((err, newURL) => {
+        if (err) return console.error(err);
+      });
+      res.json(newURL);
+    }
   } catch (TypeError) {
-    res.json({ error: "Invalid URL" });
+    res.json({
+      error: 'invalid url',
+    });
   }
 
-  URL.countDocuments({ originURL: url }, (err, count) => {
-    if (err) return console.error(err);
-    if (count > 0) {
-      res.sendStatus(201);
-      return;
+  URL.countDocuments({
+      originURL: url,
+    },
+    (err, count) => {
+      if (err) return console.error(err);
+      if (count > 0) {
+        res.sendStatus(201);
+        return;
+      }
     }
-  });
+  );
 
-  var hash = crypto.createHash("sha256").update(url).digest("hex").slice(0, 5);
-  var newURL = URL({
-    originURL: url,
-    hashURL: hash,
-  });
-  newURL.save((err, newURL) => {
-    if (err) return console.error(err);
-  });
-  res.json(newURL);
 });
 
 app.get("/api/shorturl/viewAll", (req, res) => {
@@ -85,12 +104,17 @@ app.get("/api/shorturl/viewAll", (req, res) => {
 });
 
 app.get("/api/shorturl/:hash", (req, res) => {
-  URL.findOne({ hashURL: req.params.hash }, (err, url) => {
-    if (err || url === null) 
-      return  res.json({ error: "Invalid URL" });
-
-    res.redirect(301, url.originURL);
-  });
+  URL.findOne({
+      short_url: req.params.hash,
+    },
+    (err, url) => {
+      if (err || url === null)
+        return res.json({
+          error: 'invalid url',
+        });
+      res.redirect(301, url.original_url);
+    }
+  );
 });
 
 app.delete("/api/shorturl/delete", (req, res) => {
