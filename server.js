@@ -8,17 +8,11 @@ const crypto = require("crypto");
 const urlObject = require("url").URL;
 
 const dns = require("dns");
+const { nextTick } = require("process");
 
-function isUrlValid(str) {
-  var pattern = new RegExp('^(https?:\\/\\/)?' + // protocol
-    '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|' + // domain name
-    '((\\d{1,3}\\.){3}\\d{1,3}))' + // OR ip (v4) address
-    '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*' + // port and path
-    '(\\?[;&a-z\\d%_.~+=-]*)?' + // query string
-    '(\\#[-a-z\\d_]*)?$', 'i'); // fragment locator
-  return !!pattern.test(str);
+'use strict'
 
-}
+
 //DB connection
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
@@ -37,6 +31,21 @@ const urlSchema = new mongoose.Schema({
 
 const URL = mongoose.model("URL", urlSchema);
 
+function isUrlExisted(url) {
+  var urlCount = 0;
+  URL.countDocuments({
+    original_url: url
+  }, (err, count) => {
+    if (err) return console.error(err);
+    else {
+      if (count > 0) {
+        console.log('inside async' + count);
+      }
+    }
+  });
+  return urlCount;
+
+}
 // Basic Configuration
 const port = process.env.PORT || 3000;
 
@@ -57,12 +66,22 @@ app.listen(port, function () {
   console.log(`Listening on port ${port}`);
 });
 
-app.post("/api/shorturl/new", (req, res) => {
+app.post("/api/shorturl/new", async (req, res) => {
   var url = req.body.url;
   try {
-    var urlObj = new urlObject(url);  
+    const count = await URL.countDocuments({
+        original_url: url,
+      });
+
+      if (count > 0) {
+          console.log('existed url count:' + count);
+          return res.json({
+            error: 'url existed',
+          });
+  
+      }
     if (!isUrlValid(url)) {
-      res.json({
+      return res.json({
         error: 'invalid url',
       });
     } else {
@@ -76,23 +95,11 @@ app.post("/api/shorturl/new", (req, res) => {
       });
       res.json(newURL);
     }
-  } catch (TypeError) {
+  } catch (e) {
     res.json({
       error: 'invalid url',
     });
   }
-
-  URL.countDocuments({
-      originURL: url,
-    },
-    (err, count) => {
-      if (err) return console.error(err);
-      if (count > 0) {
-        res.sendStatus(201);
-        return;
-      }
-    }
-  );
 
 });
 
@@ -123,3 +130,14 @@ app.delete("/api/shorturl/delete", (req, res) => {
     res.sendStatus(200);
   });
 });
+
+// Credit @ https://stackoverflow.com/questions/5717093/check-if-a-javascript-string-is-a-url
+function isUrlValid(str) {
+  var pattern = new RegExp('^(https?:\\/\\/)?' + // protocol
+    '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|' + // domain name
+    '((\\d{1,3}\\.){3}\\d{1,3}))' + // OR ip (v4) address
+    '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*' + // port and path
+    '(\\?[;&a-z\\d%_.~+=-]*)?' + // query string
+    '(\\#[-a-z\\d_]*)?$', 'i'); // fragment locator
+  return !!pattern.test(str);
+}
