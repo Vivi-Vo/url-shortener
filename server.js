@@ -8,7 +8,9 @@ const crypto = require("crypto");
 const urlObject = require("url").URL;
 
 const dns = require("dns");
-const { nextTick } = require("process");
+const {
+  nextTick
+} = require("process");
 
 'use strict'
 
@@ -31,21 +33,6 @@ const urlSchema = new mongoose.Schema({
 
 const URL = mongoose.model("URL", urlSchema);
 
-function isUrlExisted(url) {
-  var urlCount = 0;
-  URL.countDocuments({
-    original_url: url
-  }, (err, count) => {
-    if (err) return console.error(err);
-    else {
-      if (count > 0) {
-        console.log('inside async' + count);
-      }
-    }
-  });
-  return urlCount;
-
-}
 // Basic Configuration
 const port = process.env.PORT || 3000;
 
@@ -70,16 +57,13 @@ app.post("/api/shorturl/new", async (req, res) => {
   var url = req.body.url;
   try {
     const count = await URL.countDocuments({
-        original_url: url,
+      original_url: url,
+    });
+    if (count > 0) {
+      return res.json({
+        error: 'url existed',
       });
-
-      if (count > 0) {
-          console.log('existed url count:' + count);
-          return res.json({
-            error: 'url existed',
-          });
-  
-      }
+    }
     if (!isUrlValid(url)) {
       return res.json({
         error: 'invalid url',
@@ -140,4 +124,20 @@ function isUrlValid(str) {
     '(\\?[;&a-z\\d%_.~+=-]*)?' + // query string
     '(\\#[-a-z\\d_]*)?$', 'i'); // fragment locator
   return !!pattern.test(str);
+}
+
+function isUrlExisted(url) {
+  var urlCount = 0;
+  URL.countDocuments({
+    original_url: url
+  }, (err, count) => {
+    if (err) return console.error(err);
+    else {
+      if (count > 0) {
+        console.log('inside async' + count);
+      }
+    }
+  });
+  return urlCount;
+
 }
