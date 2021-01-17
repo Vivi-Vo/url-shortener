@@ -84,13 +84,18 @@ app.post("/api/shorturl/new", async (req, res) => {
       error: 'invalid url',
     });
   }
-
 });
 
 app.get("/api/shorturl/viewAll", (req, res) => {
   URL.find({}, (err, urls) => {
     if (err) return console.error(err);
-    res.json(urls);
+    const urlArray = urls.map((url) =>{
+      return {
+        originalURL: url.original_url,
+        shortURL: url.short_url
+      }
+    });
+    res.json(urlArray);
   });
 });
 
@@ -124,20 +129,4 @@ function isUrlValid(str) {
     '(\\?[;&a-z\\d%_.~+=-]*)?' + // query string
     '(\\#[-a-z\\d_]*)?$', 'i'); // fragment locator
   return !!pattern.test(str);
-}
-
-function isUrlExisted(url) {
-  var urlCount = 0;
-  URL.countDocuments({
-    original_url: url
-  }, (err, count) => {
-    if (err) return console.error(err);
-    else {
-      if (count > 0) {
-        console.log('inside async' + count);
-      }
-    }
-  });
-  return urlCount;
-
 }
