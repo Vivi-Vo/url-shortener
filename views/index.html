@@ -16,13 +16,26 @@
     <main>
       <section>
         <form action="api/shorturl/new" method="POST">
+
           <fieldset>
             <legend>URL Shortener</legend>
+            <h3>Create a New Shorten URL</h3>
+            <p><code>POST /api/shorturl/new</code></p>
+  
             <label for="url_input">URL:</label>
             <input id="url_input" type="text" name="url" placeholder="https://github.com/Vivi-Vo" />
             <input type="submit" value="POST URL" />
           </fieldset>
         </form>
+
+        <form action="api/shorturl/viewAll" method="GET">
+          <fieldset>
+            <h3>View all shorten URL</h3>
+            <p><code>GET /api/shorturl/viewAll</code></p>
+            <input type="submit" value="View All" />
+          </fieldset>
+        </form>
+
       </section>
     </main>
     <footer>
